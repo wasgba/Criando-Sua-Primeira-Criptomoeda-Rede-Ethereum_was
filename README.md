@@ -1,33 +1,200 @@
-# Scripts para automação da criação e configuração de uma rede Privada da Ethereum Blockchain
-Este projeto contem scripts para a criação e configuração de uma rede blockchain privada utilizando a plataforma Ethereum. Pode ser utilizado nos sistemas operacionais Linux, MacOs e Windows, para este último primeiramente instale ou git através da url https://git-scm.com/download/win ou caso utilize o windows 10 o mais indicado seria ativar o Subsistema do Windows para Linux (WSL) seguindo as instruções oficias em https://docs.microsoft.com/pt-br/windows/wsl/install-win10.
+# Scripts para Automação da Criação e Configuração de uma Rede Privada Ethereum
 
-Os principais componentes do projeto são:
-1. genesis.json
-1. start.sh
-1. password.txt
-1. private.txt
+Este documento fornece scripts e instruções para automatizar a criação e configuração de uma rede blockchain privada utilizando a plataforma Ethereum. Os scripts são compatíveis com Linux, MacOS e Windows (via WSL).
 
-Estes arquivos estão pre configurados para o funcionamento de uma rede privada com 2 carteiras pré financiadas e servidor HTTP-RPC ativado. Para utilizar o script sigua os passos.
+## 1 - Script para o Nó de Inicialização (Bootnode): `boot.sh`
 
-OBS: Para um tutorial em vídeo acesse: https://youtu.be/x76MluZ_cAQ
-OBS: [Para um tutorial de interação com os _smart contracts](docs/contract.md)
-# Alterar Genesis.json (Opcional)
-Para iniciar uma nova cadeia precisamos definir o bloco inicial com algumas configurações que indicaram como novos blocos serão inseridos, dentre estas definições destacamos:
-1. “config”: a configuração da blockchain.
-1. “chainId”: identificador utilizado na proteção contra ataque de repetição. Por exemplo, se uma ação é validada combinando certo valor que depende do ID da cadeia, os atacantes não podem obter facilmente o mesmo valor com um ID diferente.
-1. “coinbase”: é um endereço onde todas as recompensas coletadas com a validação de bloco bem-sucedida serão transferidas. Uma recompensa é uma soma da recompensa de mineração e dos reembolsos da execução de transações de contrato. Como é um bloco de gênese, o valor desse bloco pode ser qualquer coisa. Para todos os próximos blocos, o valor será um endereço definido pelo mineiro que validou esse bloco.
-1. "difficulty": dificuldade de mineração, para desenvolvimento e testes defina esse valor baixo para que você não precise esperar muito pelos blocos de mineração.
-1. “gasLimit”: o limite do custo do gás por bloco.
-1. “nonce” -  O nonce é o número de transações enviadas de um determinado endereço. É usado em combinação com mixhash para provar que uma quantidade suficiente de computação foi realizada neste bloco.
-1. “mixHash” - Um hash de 256 bits que, combinado com o nonce , prova que uma quantidade suficiente de computação foi realizada no bloco. A combinação de nonce e mixhash deve satisfazer uma condição matemática.
-1. “parentHash” - O hash do cabeçalho do bloco pai. Isso é meio que um ponteiro para o bloco pai necessário para formar uma cadeia real de blocos. Um bloco de gênese não possui um bloco pai, portanto, o resultado será apenas neste caso igual a 0.
-1. “alloc”: esse parâmetro é usado para pré-financiar alguns endereços com ether. Ele contém dois parâmetros, o endereço que deve ser um hash de 160 bits e o número de ether com o qual uma conta deve ser financiada. 
+Salve o conteúdo abaixo como `boot.sh` e torne-o executável (`chmod +x boot.sh`).
 
-A seguir temos o arquivo genesis funcional com duas contas já pré-financiadas para não ser necessário criar uma conta manualmente e colocá-la para minerar a fim de ter fundos para realizar transações.
-````json
+```bash
+#!/bin/bash
+#
+# boot.sh – Script de inicialização do Bootnode para rede privada Ethereum
+#
+# Este script gera (ou utiliza) uma chave para o bootnode, garante que a
+# pasta dos dados exista e exibe na tela a URL de conexão (enode)
+#
+# Parâmetros ajustáveis:
+#    -v Versão do cliente Ethereum (se necessário)
+#    -n NetworkID (deve coincidir com o chainId do genesis.json)
+#    -d Diretório dos dados (padrão: $HOME/.ethereum/private/boot)
+#    -k Chave do bootnode (arquivo de chave; se não existir, será gerada)
+#    -b IP do bootnode (padrão: 127.0.0.1)
+#    -p Porta do bootnode (padrão: 30301)
+
+# Configurações padrão
+VERSAO="latest"
+NETWORKID="1288"
+BOOTNODEDATADIR="$HOME/.ethereum/private/boot"
+BOOTNODEKEY="bootnode.key"
+BOOTNODEIP="127.0.0.1"
+BOOTNODEPORT="30301"
+
+usage_boot() {
+  echo "Uso: $0 [-v Versão] [-n NetworkID] [-d BootnodeDataDir] [-k BootnodeKey] [-b BootnodeIP] [-p BootnodePort]"
+  exit 1
+}
+
+# Processar os parâmetros
+while getopts "v:n:d:k:b:p:" OPTION; do
+  case "$OPTION" in
+    v) VERSAO="$OPTARG" ;;
+    n) NETWORKID="$OPTARG" ;;
+    d) BOOTNODEDATADIR="$OPTARG" ;;
+    k) BOOTNODEKEY="$OPTARG" ;;
+    b) BOOTNODEIP="$OPTARG" ;;
+    p) BOOTNODEPORT="$OPTARG" ;;
+    *) usage_boot ;;
+  esac
+done
+
+# Criar diretório de dados, se não existir
+mkdir -p "$BOOTNODEDATADIR"
+cd "$BOOTNODEDATADIR" || { echo "Erro ao acessar $BOOTNODEDATADIR"; exit 1; }
+
+# Se a chave do bootnode não existir, gerá-la
+if [ ! -f "$BOOTNODEKEY" ]; then
+  echo "Chave $BOOTNODEKEY não encontrada, gerando nova chave..."
+  bootnode -genkey "$BOOTNODEKEY" || { echo "Erro ao gerar a chave do bootnode."; exit 1; }
+fi
+
+# Gerar e exibir a URL de conexão (enode)
+# O comando abaixo utiliza bootnode em modo verboroso para extrair o enode
+BOOTNODE_ENODE=$(bootnode -nodekey "$BOOTNODEKEY" -verbosity 3 2>&1 | grep -o 'enode://[^ ]*')
+if [ -z "$BOOTNODE_ENODE" ]; then
+  echo "Falha ao gerar o enode."
+  exit 1
+fi
+
+echo "Bootnode iniciado com sucesso!"
+echo "Enode: $BOOTNODE_ENODE"
+
+# 2 - Script para Iniciar e Parar os Nós (Aplicação ou Minerador):
+start.sh
+Este script permite iniciar ou parar um nó do tipo "node" (aplicação) ou "mine" (minerador), com opções para definir a porta, diretório de dados, referência para o bootnode, etc. Salve-o como start.sh e também torne-o executável.
+
+
+
+#!/bin/bash
+#
+# start.sh – Script para iniciar/encerrar nós de rede privada Ethereum
+#
+# Tipos de nó:
+#    - node   : Nó de aplicação com servidor HTTP-RPC ativado.
+#    - mine   : Nó minerador (para mineração de blocos).
+#
+# Operações:
+#    - start  : Inicia o nó (padrão).
+#    - stop   : Para o nó (procura o processo geth a partir do diretório de dados).
+#
+# Uso:
+#    ./start.sh -t <node|mine> [-o <start|stop>] [-p <MYNODEPORT>] [-d <DATADIR>]
+#              [-i <BOOTNODEIP>] [-b <BOOTNODEID>] [-r <BOOTNODEPORT>] [-n <NETWORKID>]
+#
+# Observação: O parâmetro -b (BOOTNODEID, ou seja, o “enode” do bootnode) é obrigatório.
+
+# Configurações padrão
+NODETYPE="node"        # 'node' para aplicação ou 'mine' para minerador
+OPERATIONTYPE="start"    # start (padrão) ou stop
+MYNODEPORT="30303"
+DATADIR="$HOME/.ethereum/private/node"
+BOOTNODEIP="127.0.0.1"
+BOOTNODEID=""            # (Obrigatório) Enode do bootnode, sem o prefixo "enode://"
+BOOTNODEPORT="30301"
+NETWORKID="1288"
+
+usage_start() {
+  cat <<EOL
+Uso: $0 -t <node|mine> [-o <start|stop>] [-p <MYNODEPORT>] [-d <DATADIR>] [-i <BOOTNODEIP>] [-b <BOOTNODEID>] [-r <BOOTNODEPORT>] [-n <NETWORKID>]
+
+    -t : Tipo de nó. 'node' para aplicação (HTTP-RPC) ou 'mine' para minerador.
+    -o : Operação: 'start' (padrão) para iniciar ou 'stop' para finalizar o nó.
+    -p : Porta do nó local (padrão 30303; se for minerador pode ser alterada, ex: 30304).
+    -d : Diretório de dados onde os arquivos da rede são armazenados (padrão: \$HOME/.ethereum/private/node).
+    -i : IP do bootnode (padrão: 127.0.0.1).
+    -b : ID do bootnode (enode) – O parâmetro é obrigatório.
+    -r : Porta do bootnode (padrão: 30301).
+    -n : NetworkID (chainId) (padrão: 1288).
+
+Exemplo para iniciar um nó de aplicação:
+    ./start.sh -t node -b abcdef...123456
+
+Exemplo para iniciar um nó minerador com porta diferenciada:
+    ./start.sh -t mine -p 30304 -b abcdef...123456
+EOL
+  exit 1
+}
+
+# Processar os parâmetros
+while getopts "t:o:p:d:i:b:r:n:" OPTION; do
+  case "$OPTION" in
+    t) NODETYPE="$OPTARG" ;;
+    o) OPERATIONTYPE="$OPTARG" ;;
+    p) MYNODEPORT="$OPTARG" ;;
+    d) DATADIR="$OPTARG" ;;
+    i) BOOTNODEIP="$OPTARG" ;;
+    b) BOOTNODEID="$OPTARG" ;;
+    r) BOOTNODEPORT="$OPTARG" ;;
+    n) NETWORKID="$OPTARG" ;;
+    *) usage_start ;;
+  esac
+done
+
+if [ -z "$BOOTNODEID" ]; then
+  echo "Erro: BOOTNODEID (enode) deve ser especificado com a flag -b."
+  usage_start
+fi
+
+# Função para iniciar/parar o nó
+start_node() {
+  echo "Tipo de nó: $NODETYPE"
+  echo "Operação: $OPERATIONTYPE"
+  echo "Diretório de dados: $DATADIR"
+  mkdir -p "$DATADIR"
+
+  # Monta o comando base do geth
+  CMD="geth --datadir $DATADIR --networkid $NETWORKID --port $MYNODEPORT --bootnodes enode://$BOOTNODEID@$BOOTNODEIP:$BOOTNODEPORT"
+
+  if [ "$NODETYPE" = "mine" ]; then
+    # Para nó minerador, ativa a mineração com 1 thread
+    CMD="$CMD --mine --miner.threads=1"
+  elif [ "$NODETYPE" = "node" ]; then
+    # Para nó de aplicação, ativa a API HTTP (ajuste as opções conforme necessário)
+    CMD="$CMD --http --http.addr 127.0.0.1 --http.port 8545 --http.api eth,net,web3,personal --http.corsdomain '*'"
+  else
+    echo "Tipo de nó '$NODETYPE' não reconhecido. Utilize 'node' ou 'mine'."
+    usage_start
+  fi
+
+  if [ "$OPERATIONTYPE" = "start" ]; then
+    echo "Executando: $CMD"
+    # Executa o nó em background (nohup garante que continue funcionando)
+    nohup $CMD >> "$DATADIR/node.log" 2>&1 &
+    echo "Nó iniciado. Verifique os logs em: $DATADIR/node.log"
+  elif [ "$OPERATIONTYPE" = "stop" ]; then
+    # Para encerrar o nó, procura o processo geth que utiliza o diretório de dados especificado
+    PID=$(pgrep -f "geth --datadir $DATADIR")
+    if [ -z "$PID" ]; then
+      echo "Nenhum processo geth encontrado para o diretório $DATADIR."
+    else
+      kill $PID
+      echo "Processo geth (PID $PID) finalizado."
+    fi
+  else
+    echo "Operação '$OPERATIONTYPE' não reconhecida. Utilize 'start' ou 'stop'."
+    usage_start
+  fi
+}
+
+start_node
+
+# 3 - Ajustando o Arquivo genesis.json
+O arquivo genesis.json define as propriedades iniciais da sua rede blockchain. Edite-o conforme suas necessidades, como alterar o chainId, a dificuldade de mineração ou os endereços pré-financiados.
+
+
 {
   "config": {
-    "chainId": 1288,
+    "chainId": 1288,                        // Identificador da rede
     "homesteadBlock": 0,
     "eip150Block": 0,
     "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -43,7 +210,7 @@ A seguir temos o arquivo genesis funcional com duas contas já pré-financiadas 
   "timestamp": "0x5f527daa",
   "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "gasLimit": "0x2fefd8ffffffffff",
-  "difficulty": "0x80000",
+  "difficulty": "0x80000",                   // Dificuldade baixa para facilitar testes e desenvolvimento
   "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "coinbase": "0x0000000000000000000000000000000000000000",
   "alloc": {
@@ -58,78 +225,44 @@ A seguir temos o arquivo genesis funcional com duas contas já pré-financiadas 
   "gasUsed": "0x0",
   "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
 }
-````
-Este arquivo pode ser alterado de acordo com sua necessidade.
-# 1. Iniciar BootNode
-Um passo importante para o correto funcionamento de uma rede privada conectada por vários nós e a definição de um nó central o qual os demais se ligarão.  Nomeamos o script para criação deste nó como boot.sh. 
 
-Para a execução deste e dos próximos nós faz necessária a definição de alguns parâmetros referentes à conexão da rede. Todos os parâmetros estão definidos no início do arquivo boot.sh que podem ser editados ou passados por parâmetro na chamada dos scripts, os referentes ao nó do boot e os parâmetros utilizados para alterar seus valores ao executar a função são:
+# 4 - Funcionamento Geral e Instruções de Uso
 
-1. VERSION (-v): Versão do arquivo binário do Ethereum a ser instalado.
-1. NETWORKID (-n): Deve ser o mesmo do arquivo genesis.
-1. BOOTNODEDATADIR (-d): Pasta no computador em que  os arquivos da rede serão armazenados. Por padrão: $HOME/.ethereum/private/boot.
-1. BOOTNODEKEY (-k): Um nó de inicialização pede uma chave hexadecimal e através dela será gerado um ID  descrito com um esquema de URL chamado “enode” para conexão de outros nós, deixamos esse valor pré-definido para podermos ter certeza da url de conexão que será utilizado pelos demais nós. Esse valor pode ser gerado pelo comando: bootnode -genkey bootnode.key.
-1. BOOTNODEIP (-b): O IP da máquina em que será instanciado o bootnode.
-1. BOOTNODEPORT (-p): A porta em que o boot node deverá expor à rede. Por padrão 30301.
+Configurar genesis.json:  Edite o arquivo genesis.json para definir as propriedades iniciais da rede e pré-financiar as contas.
 
-Atenção aos parâmetros BOOTNODEIP e BOOTNODEPORT, esses devem estar corretamente configurados para sua máquina.
 
-Para executar o script e crirar o boot node digite no terminal dentro da diretorio do projeto:
+Iniciar o Bootnode:
+./boot.sh -b [IP_desejado] -p [Porta_desejada]  # Ou apenas ./boot.sh para os padrões
+Anote o enode gerado pelo bootnode, pois será necessário para os outros nós.
 
-````shell script 
-./start.sh -t boot                       #iniciar com todos os parâmetros padrões
-````
-Adicionalmente, podem ser alterados os parâmetros por linha de comando adicionando a flag correspondente ao paramentro, exemplo para alterar o BOOTNODEID:
-````shell script  
-./start.sh -t boot -b 192.168.0.177      #iniciar alterando ip do bootnode
-````
 
-A saída esperada escrita no log, indicando que a rede foi inicializada e qual é o endereço de conexão (enode) de novos nós.
-````
-INFO [09-24|18:00:36.897] Started P2P networking self=enode://4e87faaa0ed677c3ec389f3ac37f8b0e366876f73e72764e3518031daca322768befb783be5c4aea4200f3439f4361571e860c38776142094adc35913964096b@192.168.1.114:30301
-````
+Iniciar um Nó de Aplicação:
 
-# 2. Iniciar um nó de aplicação e nó minerador
 
-Com o bootnode criado, podemos integrar à redes mais dois tipos de nós, o de aplicação (responsável por externar um api a qual será utilizado para inserção e consulta dos dados da blockchain) e outro nó para mineração dos dados enviados para serem inseridos na rede.
+./start.sh -t node -b [BOOTNODE_ENODE_sem_prefixo]
 
-Os arquivos criados para este fim são o start.sh (script executável), .accountpassword (contendo a senha da carteira a ser pré-alocada) e .privatekey (chave privada da carteira pré-alocada). A senha e a chave privadas foram pré definidas já que estamos importando uma conta ao invés de criar uma nova, já que para pré-financiar uma conta devemos colocá-la no arquivo genesis.json antes de iniciarmos a rede. 
 
-Os parâmetros definidos para o script start.sh presentes no início do arquivo foram:
-1. NODETYPE (-t) (aceitando dois tipos: 'node' para um nó de aplicação, este definido por padrão, e 'miner' para um nó minerador).
-1. OPERATIONTYPE (-o) (aceita os comandos 'start' e 'stop' para, respectivamente, iniciar e parar a rede blockchain ).
-1. MYNODEPORT (-p) (Porta em que será executada a rede no computador que está iniciando o nó. Por padrão: 30303).
-1. DATADIR (-d) (Pasta no computador em que  os arquivos da rede serão armazenados. Por padrão: $HOME/.ethereum/private/node.
-1. BOOTNODEIP (-i) (deve ser o ip da máquina que está rodando o bootnode)
-1. BOOTNODEID (-b) (deve ser o id criado pela execução do bootnode, se não foi alterado o BOOTNODEKEY este já está configurado)
-1. BOOTNODEPORT (-r) (porta em que está sendo executado bootnode, por padrão: 30301)
-1. NETWORKID (-n) (é o mesmo chainId do arquivo genesis.json)
+Este script iniciará o geth com a API HTTP ativada.
 
-Certifique-se que os parâmetros do BOOTNODE são os mesmos utilizado na execução do boot.sh.
 
-Execute o nó de aplicação com o comando:
+Iniciar um Nó Minerador:
 
-`````shell script
-./start.sh -t node
-`````
-Com o nó de aplicação iniciado, espera-se a linha indica que o servidor HTTP foi ativado.
-````
-INFO [09-24|18:10:56.117] HTTP server started   endpoint=127.0.0.1:8545 cors= vhosts=localhost
-````
 
-Execute o nó minerador com o comando:
+./start.sh -t mine -p 30304 -b [BOOTNODE_ENODE_sem_prefixo] # Se estiver na mesma máquina, altere a porta
 
-`````shell script
-./start.sh -t mine 
-`````
 
-Se estiver executando estes dois nós na mesma maquina, ao executar o nó minerador certifique-se de alterar o MYNODEPORT para não gerar conflito entre os nós.
+Parar um Nó:
 
-`````shell script
-./start.sh -t mine -p 30304
-`````
-Com o nó minerador iniciado, espera-se a linha que indica o início do trabalho de mineração indicado pela saída “Commit new mining work”.
 
-````
-INFO [09-24|18:15:13.672] Commit new mining work   nunber=1 sealhash="c8ecb8...6394dc" uncles=0 txs=0 gas=0 fess=0 elapsed="216.9μs"
-````
+./start.sh -t node -o stop -d [diretório_do_nó]
+# ou
+./start.sh -t mine -o stop -d [diretório_do_nó]
+
+
+Observações Finais
+
+Se estiver utilizando o Windows, considere utilizar o Subsistema do Windows para Linux (WSL).
+
+Certifique-se de que os binários (geth, bootnode) estejam instalados e no PATH do sistema.
+
+Armazene senhas (senha.txt, .accountpassword) e chaves privadas (privado.txt) de forma segura.
